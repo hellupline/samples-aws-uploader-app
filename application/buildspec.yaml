@@ -1,0 +1,18 @@
+---
+version: 0.2
+phases:
+    install:
+        runtime-versions:
+            python: 3.7
+    build:
+        commands:
+          - aws cloudformation package
+                --s3-bucket=${BUILD_OUTPUT_BUCKET}
+                --s3-prefix=${BUILD_OUTPUT_PREFIX}
+                --template-file=application/template.yaml
+                --output-template-file=application/packaged.yaml
+
+artifacts:
+    base-directory: ./application
+    files:
+      - packaged.yaml

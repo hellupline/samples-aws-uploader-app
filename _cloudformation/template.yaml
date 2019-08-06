@@ -1,0 +1,59 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'HellUpLine Uploader'
+
+Metadata:
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+          - Label: {default: 'Application Parameters'}
+            Parameters:
+              - ApplicationAcmCertificateArn
+              - ApplicationDomainName
+          - Label: {default: 'Website Parameters'}
+            Parameters:
+              - WebsiteAcmCertificateArn
+              - WebsiteDomainName
+
+Parameters:
+    WebsiteAcmCertificateArn:
+        Description: 'The ARN of the SSL certificate to use for the CloudFront distribution.'
+        Type: String
+    WebsiteDomainName:
+        Description: 'The website domain name.'
+        Type: String
+    ApplicationAcmCertificateArn:
+        Description: 'The ARN of the SSL certificate to use for the ApiGateway.'
+        Type: String
+    ApplicationDomainName:
+        Description: 'The application domain name.'
+        Type: String
+
+Mappings: {}
+
+Conditions: {}
+
+Resources:
+    CodePipeline:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: './code-pipeline.yaml'
+            Parameters:
+                ParentStackName: !Sub '${AWS::StackName}'
+                GithubUser: 'hellupline'
+                GithubRepo: 'uploader'
+                GithubBranch: 'master'
+                ApplicationAcmCertificateArn: !Ref ApplicationAcmCertificateArn
+                ApplicationDomainName: !Ref ApplicationDomainName
+                WebsiteBucket: !GetAtt Website.Outputs.Bucket
+            TimeoutInMinutes: 15
+
+    Website:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: './website.yaml'
+            Parameters:
+                AcmCertificateArn: !Ref WebsiteAcmCertificateArn
+                DomainName: !Ref WebsiteDomainName
+            TimeoutInMinutes: 120
+
+Outputs: {}

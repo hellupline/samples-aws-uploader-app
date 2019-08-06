@@ -1,0 +1,110 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: 'HellUpLine Uploader Website'
+
+Metadata:
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+          - Label: {default: 'Website Parameters'}
+            Parameters:
+              - AcmCertificateArn
+              - DomainName
+
+Parameters:
+    AcmCertificateArn:
+        Description: 'The ARN of the SSL certificate to use for the CloudFront distribution.'
+        Type: String
+    DomainName:
+        Description: 'The website domain name.'
+        Type: String
+
+Mappings: {}
+
+Conditions: {}
+
+Resources:
+    CloudFrontDistribution:
+        Type: AWS::CloudFront::Distribution
+        Properties:
+            DistributionConfig:
+                Enabled: true
+                PriceClass: 'PriceClass_All'
+                HttpVersion: 'http2'
+                IPV6Enabled: true
+                ViewerCertificate:
+                    AcmCertificateArn: !Ref AcmCertificateArn
+                    MinimumProtocolVersion: 'TLSv1.2_2018'
+                    SslSupportMethod: 'sni-only'
+                Aliases:
+                  - !Ref DomainName
+                Origins:
+                  - DomainName: !GetAtt Bucket.DomainName
+                    Id: 's3origin'
+                    S3OriginConfig:
+                        OriginAccessIdentity: !Sub 'origin-access-identity/cloudfront/${CloudFrontOriginAccessIdentity}'
+                DefaultCacheBehavior:
+                    TargetOriginId: 's3origin'
+                    ViewerProtocolPolicy: 'redirect-to-https'
+                    Compress: true
+                    SmoothStreaming: false
+                    ForwardedValues:
+                        QueryString: false
+                        Cookies:
+                            Forward: 'none'
+                    AllowedMethods:
+                        - 'GET'
+                        - 'HEAD'
+                        - 'OPTIONS'
+                CustomErrorResponses:
+                  - ErrorCachingMinTTL: 300
+                    ErrorCode: 403
+                    ResponseCode: 200
+                    ResponsePagePath: '/index.html'
+                DefaultRootObject: 'index.html'
+
+    CloudFrontOriginAccessIdentity:
+        Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+        Properties:
+            CloudFrontOriginAccessIdentityConfig:
+                Comment: !Sub "access-identity-${Bucket.WebsiteURL}"
+
+    Bucket:
+        Type: AWS::S3::Bucket
+        DeletionPolicy: Retain
+        Properties:
+            AccessControl: Private
+            PublicAccessBlockConfiguration:
+                BlockPublicAcls: True
+                BlockPublicPolicy: True
+                IgnorePublicAcls: True
+                RestrictPublicBuckets: True
+            VersioningConfiguration:
+                Status: Enabled
+            LifecycleConfiguration:
+                Rules:
+                  - Id: IncompleteUploads
+                    Status: Enabled
+                    AbortIncompleteMultipartUpload:
+                        DaysAfterInitiation: 5
+                  - Id: VersionsCleanup
+                    Status: Enabled
+                    NoncurrentVersionExpirationInDays: 365
+
+    BucketPolicy:
+        Type: AWS::S3::BucketPolicy
+        Properties:
+            Bucket: !Ref Bucket
+            PolicyDocument:
+                Statement:
+                  - Effect: Allow
+                    Principal:
+                        CanonicalUser: !GetAtt CloudFrontOriginAccessIdentity.S3CanonicalUserId
+                    Action:
+                      - 's3:GetObject'
+                    Resource:
+                      - !Sub '${Bucket.Arn}/*'
+
+Outputs:
+    Bucket:
+        Value: !Ref Bucket

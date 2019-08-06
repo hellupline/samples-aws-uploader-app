@@ -1,0 +1,113 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: 'HellUpLine Uploader Application'
+
+Metadata:
+    AWS::CloudFormation::Interface:
+        ParameterGroups:
+          - Label: {default: 'Api Parameters'}
+            Parameters:
+              - AcmCertificateArn
+              - DomainName
+
+Parameters:
+    AcmCertificateArn:
+        Description: 'The ARN of the SSL certificate to use for the ApiGateway.'
+        Type: String
+    DomainName:
+        Description: 'The application domain name.'
+        Type: String
+
+Mappings: {}
+
+Conditions: {}
+
+Resources:
+    GetUploadUrlFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            CodeUri: get_upload_url/
+            Handler: app.lambda_handler
+            Runtime: python3.7
+            Timeout: 3
+            Environment:
+                Variables:
+                    BUCKET_NAME: !Ref UploadBucket
+                    KEY_PREFIX: "romes"
+            Events:
+                GetUploadUrl:
+                    Type: Api
+                    Properties:
+                        RestApiId: !Ref RestApi
+                        Path: /get-upload-url
+                        Method: post
+            Policies:
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - 's3:PutObject'
+                    Resource:
+                      - !Sub '${UploadBucket.Arn}/*'
+
+    RestApi:
+        Type: AWS::Serverless::Api
+        Properties:
+            StageName: Prod
+            Cors:
+                AllowMethods: "'OPTIONS,HEAD,GET,POST,PATCH,PUT,DELETE'"
+                AllowHeaders: "'X-Forwarded-For,Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                AllowOrigin: "'*'"
+                MaxAge: "'600'"
+                AllowCredentials: "'true'"
+
+    RestApiDomainName:
+        Type: AWS::ApiGateway::DomainName
+        Properties:
+            CertificateArn: !Ref AcmCertificateArn
+            DomainName: !Ref DomainName
+
+    RestApiPathMapping:
+        Type: AWS::ApiGateway::BasePathMapping
+        Properties:
+            DomainName: !Ref RestApiDomainName
+            RestApiId: !Ref RestApi
+            Stage: Prod
+
+    UploadBucket:
+        Type: AWS::S3::Bucket
+        DeletionPolicy: Retain
+        Properties:
+            AccessControl: Private
+            PublicAccessBlockConfiguration:
+                BlockPublicAcls: True
+                BlockPublicPolicy: True
+                IgnorePublicAcls: True
+                RestrictPublicBuckets: True
+            CorsConfiguration:
+                CorsRules:
+                  - Id: SignedUrlLambda
+                    AllowedMethods: ['GET', 'POST', 'PUT']
+                    AllowedHeaders: ['*']
+                    AllowedOrigins: ['*']
+                    ExposedHeaders: ['Date']
+                    MaxAge: 3600
+            LifecycleConfiguration:
+                Rules:
+                  - Id: IncompleteUploads
+                    Status: Enabled
+                    AbortIncompleteMultipartUpload:
+                        DaysAfterInitiation: 5
+
+Outputs:
+    GetUploadUrlFunctionApi:
+        Description: "API Gateway endpoint URL for Prod stage for Hello World function"
+        Value: !Sub "https://${DomainName}/get-upload-url/"
+        # Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/get-upload-url/"
+    GetUploadUrlFunction:
+        Description: "Get Upload URL Lambda Function ARN"
+        Value: !GetAtt GetUploadUrlFunction.Arn
+    GetUploadUrlFunctionIamRole:
+        Description: "Implicit IAM Role created for Get Upload URL function"
+        Value: !GetAtt GetUploadUrlFunctionRole.Arn
