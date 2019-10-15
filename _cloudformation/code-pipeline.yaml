@@ -60,7 +60,7 @@ Resources:
         Properties:
             RoleArn: !GetAtt CodePipelineRole.Arn
             ArtifactStore:
-                Location: '{{resolve:ssm:/artifacts-store:1}}'
+                Location: '{{resolve:ssm:/core/build/artifact-store:1}}'
                 Type: S3
             Stages:
               - Name: Source
@@ -150,8 +150,20 @@ Resources:
                     InputArtifacts:
                       - Name: WebsiteBuildArtifactAsZip
                     RunOrder: 1
+              - Name: InvalidateCache
+                Actions:
+                  - Name: InvokeLambda
+                    ActionTypeId:
+                        Category: Invoke
+                        Owner: AWS
+                        Provider: Lambda
+                        Version: '1'
+                    Configuration:
+                        FunctionName: cloud-front-create-invalidation
+                        UserParameters: !Ref CloudFrontDistribution
+                    RunOrder: 1
 
-    PipelineWebhook:
+        PipelineWebhook:
         Type: AWS::CodePipeline::Webhook
         Properties:
             TargetPipeline: !Ref Pipeline
@@ -176,18 +188,9 @@ Resources:
                     Action: ['sts:AssumeRole']
             Path: /
             ManagedPolicyArns:
-                - '{{resolve:ssm:/managed-policies/artifacts-store:1}}'
-                - '{{resolve:ssm:/managed-policies/logs:1}}'
+                - '{{resolve:ssm:/core/build/managed-policies/artifact-store:1}}'
+                - '{{resolve:ssm:/core/build/managed-policies/logs:1}}'
             Policies:
-              - PolicyName: iam
-                PolicyDocument:
-                    Version: '2012-10-17'
-                    Statement:
-                      - Effect: Allow
-                        Action:
-                          - 'iam:PassRole'
-                        Resource:
-                          - !GetAtt CloudFormationExecutionRole.Arn
               - PolicyName: codebuild
                 PolicyDocument:
                     Version: '2012-10-17'
@@ -199,7 +202,7 @@ Resources:
                         Resource:
                           - !Sub '${ApplicationCodeBuildProject.Arn}'
                           - !Sub '${WebsiteCodeBuildProject.Arn}'
-              - PolicyName: application-cloudformation
+              - PolicyName: cloudformation
                 PolicyDocument:
                     Version: '2012-10-17'
                     Statement:
@@ -211,6 +214,15 @@ Resources:
                           - 'cloudformation:DeleteStack'
                         Resource:
                           - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ParentStackName}-application/*'
+              - PolicyName: iam
+                PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 'iam:PassRole'
+                        Resource:
+                          - !GetAtt CloudFormationExecutionRole.Arn
               - PolicyName: website-bucket
                 PolicyDocument:
                     Version: '2012-10-17'
@@ -306,8 +318,8 @@ Resources:
                 ComputeType: BUILD_GENERAL1_SMALL
                 Image: aws/codebuild/standard:2.0
                 EnvironmentVariables:
-                  - {Name: BUILD_OUTPUT_BUCKET, Value: '{{resolve:ssm:/artifacts-store:1}}'}
-                  - {Name: BUILD_OUTPUT_PREFIX, Value: !Sub '${AWS::StackName}/application-cf-packages'}
+                  - {Name: BUILD_OUTPUT_BUCKET, Value: '{{resolve:ssm:/core/build/artifact-store:1}}'}
+                  - {Name: BUILD_OUTPUT_PREFIX, Value: !Sub '${ParentStackName}/application-codebuild-artifact'}
 
     WebsiteCodeBuildProject:
         Type: AWS::CodeBuild::Project
@@ -324,7 +336,7 @@ Resources:
                 Image: aws/codebuild/standard:2.0
             Cache:
                 Type: S3
-                Location: !Sub "{{resolve:ssm:/artifacts-store:1}}/${AWS::StackName}/website-codebuild-cache"
+                Location: !Sub "{{resolve:ssm:/core/build/artifact-store:1}}/${ParentStackName}/website-codebuild-cache"
 
     CodeBuildServiceRole:
         Type: AWS::IAM::Role
@@ -337,7 +349,7 @@ Resources:
                     Action: ['sts:AssumeRole']
             Path: /
             ManagedPolicyArns:
-                - '{{resolve:ssm:/managed-policies/artifacts-store:1}}'
-                - '{{resolve:ssm:/managed-policies/logs:1}}'
+                - '{{resolve:ssm:/core/build/managed-policies/artifact-store:1}}'
+                - '{{resolve:ssm:/core/build/managed-policies/logs:1}}'
 
 Outputs: {}

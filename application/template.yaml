@@ -44,6 +44,7 @@ Resources:
                         Path: /get-upload-url
                         Method: post
             Policies:
+              - Version: '2012-10-17'
                 Statement:
                   - Effect: Allow
                     Action:
