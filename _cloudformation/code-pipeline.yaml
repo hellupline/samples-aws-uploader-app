@@ -13,6 +13,7 @@ Metadata:
             Parameters:
               - ApplicationAcmCertificateArn
               - ApplicationDomainName
+              - CloudFrontDistributionId
           - Label: {default: 'Website Parameters'}
             Parameters:
               - WebsiteBucket
@@ -30,7 +31,7 @@ Parameters:
     GithubToken:
         Type: 'AWS::SSM::Parameter::Value<String>'
         Description: 'Github OAuth Token with full permissions on admin:repo_hook and repo'
-        Default: '/github/token/hellupline'
+        Default: '/core/build/github/token'
     GithubUser:
         Type: String
         Description: 'Github user where the repository lives'
@@ -45,6 +46,9 @@ Parameters:
         Type: String
     ApplicationDomainName:
         Description: 'The website domain name.'
+        Type: String
+    CloudFrontDistributionId:
+        Description: 'CloudFront Distribution Id to invalidate cache'
         Type: String
     WebsiteBucket:
         Description: 'Bucket for Website static files'
@@ -150,7 +154,7 @@ Resources:
                     InputArtifacts:
                       - Name: WebsiteBuildArtifactAsZip
                     RunOrder: 1
-              - Name: InvalidateCache
+              - Name: CacheInvalidation
                 Actions:
                   - Name: InvokeLambda
                     ActionTypeId:
@@ -159,23 +163,23 @@ Resources:
                         Provider: Lambda
                         Version: '1'
                     Configuration:
-                        FunctionName: cloud-front-create-invalidation
-                        UserParameters: !Ref CloudFrontDistribution
+                        FunctionName: '{{resolve:ssm:/core/functions/cloudfront-create-invalidation/name:1}}'
+                        UserParameters: !Ref CloudFrontDistributionId
                     RunOrder: 1
 
-        PipelineWebhook:
-        Type: AWS::CodePipeline::Webhook
-        Properties:
-            TargetPipeline: !Ref Pipeline
-            TargetPipelineVersion: !GetAtt Pipeline.Version
-            TargetAction: SourceGithub
-            RegisterWithThirdParty: true
-            Authentication: GITHUB_HMAC
-            AuthenticationConfiguration:
-                SecretToken: !Ref GithubToken
-            Filters:
-              - JsonPath: "$.ref"
-                MatchEquals: refs/heads/{Branch}
+    # PipelineWebhook:
+    #     Type: AWS::CodePipeline::Webhook
+    #     Properties:
+    #         TargetPipeline: !Ref Pipeline
+    #         TargetPipelineVersion: !GetAtt Pipeline.Version
+    #         TargetAction: SourceGithub
+    #         RegisterWithThirdParty: true
+    #         Authentication: GITHUB_HMAC
+    #         AuthenticationConfiguration:
+    #             SecretToken: !Ref GithubToken
+    #         Filters:
+    #           - JsonPath: "$.ref"
+    #             MatchEquals: refs/heads/{Branch}
 
     CodePipelineRole:
         Type: AWS::IAM::Role
@@ -188,8 +192,9 @@ Resources:
                     Action: ['sts:AssumeRole']
             Path: /
             ManagedPolicyArns:
-                - '{{resolve:ssm:/core/build/managed-policies/artifact-store:1}}'
-                - '{{resolve:ssm:/core/build/managed-policies/logs:1}}'
+              - '{{resolve:ssm:/core/build/managed-policies/artifact-store:1}}'
+              - '{{resolve:ssm:/core/build/managed-policies/logs:1}}'
+              - '{{resolve:ssm:/core/funcitons/cloudfront-create-invalidation/managed-policy:1}}'
             Policies:
               - PolicyName: codebuild
                 PolicyDocument:
@@ -245,8 +250,8 @@ Resources:
                     Principal: {Service: ['cloudformation.amazonaws.com']}
                     Action: ['sts:AssumeRole']
             ManagedPolicyArns:
-                - '{{resolve:ssm:/managed-policies/artifacts-store:1}}'
-                - '{{resolve:ssm:/managed-policies/logs:1}}'
+              - '{{resolve:ssm:/core/build/managed-policies/artifact-store:1}}'
+              - '{{resolve:ssm:/core/build/managed-policies/logs:1}}'
             Policies:
               - PolicyName: cloudformation
                 PolicyDocument:
@@ -303,6 +308,15 @@ Resources:
                           - 'cloudfront:UpdateDistribution'
                         Resource:
                           - '*'
+              - PolicyName: s3
+                PolicyDocument:
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 's3:*'
+                        Resource:
+                          - !Sub 'arn:${AWS::Partition}:s3:::*'
+                          - !Sub 'arn:${AWS::Partition}:s3:::*/*'
 
     ApplicationCodeBuildProject:
         Type: AWS::CodeBuild::Project
@@ -349,7 +363,7 @@ Resources:
                     Action: ['sts:AssumeRole']
             Path: /
             ManagedPolicyArns:
-                - '{{resolve:ssm:/core/build/managed-policies/artifact-store:1}}'
-                - '{{resolve:ssm:/core/build/managed-policies/logs:1}}'
+              - '{{resolve:ssm:/core/build/managed-policies/artifact-store:1}}'
+              - '{{resolve:ssm:/core/build/managed-policies/logs:1}}'
 
 Outputs: {}

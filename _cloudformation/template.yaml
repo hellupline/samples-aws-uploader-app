@@ -38,12 +38,13 @@ Resources:
         Properties:
             TemplateURL: './code-pipeline.yaml'
             Parameters:
-                ParentStackName: !Sub '${AWS::StackName}'
+                ParentStackName: !Ref AWS::StackName
                 GithubUser: 'hellupline'
-                GithubRepo: 'uploader'
+                GithubRepo: 'samples-aws-uploader-app'
                 GithubBranch: 'master'
                 ApplicationAcmCertificateArn: !Ref ApplicationAcmCertificateArn
                 ApplicationDomainName: !Ref ApplicationDomainName
+                CloudFrontDistributionId: !GetAtt Website.Outputs.CloudFrontDistribution
                 WebsiteBucket: !GetAtt Website.Outputs.Bucket
             TimeoutInMinutes: 15
 
