@@ -1,0 +1,18 @@
+{
+    "Amplify": {
+        "Auth": {
+            "region": "",
+            "identityPoolId": "",
+            "userPoolId": "",
+            "userPoolWebClientId": ""
+        },
+        "API": {
+            "endpoints": [
+                {
+                    "name": "",
+                    "endpoint": ""
+                }
+            ]
+        }
+    }
+}

@@ -2,20 +2,31 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
 
+import { withAuthenticator } from 'aws-amplify-react';
+import Amplify, { API, Auth } from 'aws-amplify';
+import Lambda from 'aws-sdk/clients/lambda';
+
 import ProgressBar from "react-bootstrap/ProgressBar";
 import Button from "react-bootstrap/Button";
 
 import "bootstrap/dist/css/bootstrap.css";
 import "./App.css";
 
-const UPLOAD_URL = process.env.REACT_APP_GET_UPLOAD_URL_FUNCTION_API;
+import settings from './settings.json';
+
+
+Amplify.configure(settings.Amplify);
 
 
 function App() {
-  return (<div className="App"> <UploadDropzone /> </div>);
+  return (
+    <div className="App">
+      <UploadDropzone /> 
+    </div>
+  );
 }
 
-export default App;
+export default withAuthenticator(App);
 
 
 function UploadDropzone() {
@@ -43,31 +54,10 @@ function FileUploader({ file }) {
   const [progress, setProgress] = useState(0);
 
   const requestCancel = useMemo(() => axios.CancelToken.source(), []);
-  const handleCancelClick = () => {
-    requestCancel.cancel("Operation canceled by the user.");
-  };
 
-  useEffect(() => {
-    const uploadFile = async (file) => {
-      const response = await axios.post(UPLOAD_URL, {filename: file.path});
-      const { data } = response;
-      const { upload_url } = data;
-      const updateProgress = e => setProgress(e.loaded);
-      try {
-        setState("in-progress");
-        await axios.put(upload_url, file, {
-          onUploadProgress: updateProgress,
-          cancelToken: requestCancel.token,
-          headers: {"Content-Type": ""},
-        });
-        setState("completed");
-      } catch (ex) {
-        setState("error");
-        throw ex;
-      }
-    };
-    uploadFile(file); 
-  }, [file, requestCancel]);
+  const handleCancelClick = () => requestCancel.cancel("Operation canceled by the user.")
+
+  useEffect(() => uploadFile(file, setState, setProgress, requestCancel), [file, requestCancel]);
 
   const total = Math.round((progress * 100) / file.size);
   return (
@@ -87,4 +77,22 @@ function FileUploader({ file }) {
       </div>
     </li>
   );
+}
+
+
+async function uploadFile(file, setState, setProgress, requestCancel) {
+  try {
+    const res = await API.post("uploader", '/get-upload-url');
+    const { upload_url } = res;
+    setState("in-progress");
+    await axios.put(upload_url, file, {
+      onUploadProgress: e => setProgress(e.loaded),
+      cancelToken: requestCancel.token,
+      headers: {"Content-Type": ""},
+    });
+    setState("completed");
+  } catch (ex) {
+    setState("error");
+    throw ex;
+  }
 }
