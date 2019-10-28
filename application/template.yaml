@@ -25,6 +25,9 @@ Mappings: {}
 Conditions: {}
 
 Resources:
+    #
+    # Functions
+    #
     GetUploadUrlFunction:
         Type: AWS::Serverless::Function
         Properties:
@@ -40,9 +43,11 @@ Resources:
                 GetUploadUrl:
                     Type: Api
                     Properties:
-                        RestApiId: !Ref RestApi
                         Path: /get-upload-url
-                        Method: post
+                        Method: GET
+                        RestApiId: !Ref RestApi
+                        # Auth:
+                        #     Authorizer: NONE
             Policies:
               - Version: '2012-10-17'
                 Statement:
@@ -52,6 +57,9 @@ Resources:
                     Resource:
                       - !Sub '${UploadBucket.Arn}/*'
 
+    #
+    # Api
+    #
     RestApi:
         Type: AWS::Serverless::Api
         Properties:
@@ -62,6 +70,17 @@ Resources:
                 AllowOrigin: "'*'"
                 MaxAge: "'600'"
                 AllowCredentials: "'true'"
+            # Auth:
+            #     DefaultAuthorizer: CognitoAuthorizer
+            #     Authorizers:
+            #         CognitoAuthorizer:
+            #             UserPoolArn: !GetAtt UserPool.Arn
+            # MethodSettings:
+            #   - HttpMethod: "*"
+            #     ResourcePath: "/*"
+            #     LoggingLevel: INFO
+            #     DataTraceEnabled: true
+            #     MetricsEnabled: true
 
     RestApiDomainName:
         Type: AWS::ApiGateway::DomainName
@@ -76,6 +95,9 @@ Resources:
             RestApiId: !Ref RestApi
             Stage: Prod
 
+    #
+    # Storage
+    #
     UploadBucket:
         Type: AWS::S3::Bucket
         DeletionPolicy: Retain
@@ -101,14 +123,175 @@ Resources:
                     AbortIncompleteMultipartUpload:
                         DaysAfterInitiation: 5
 
+
+    #
+    # Authentication
+    #
+    UserPool:
+        Type: AWS::Cognito::UserPool
+        Properties:
+            AdminCreateUserConfig:
+                AllowAdminCreateUserOnly: true
+                UnusedAccountValidityDays: 30
+                InviteMessageTemplate:
+                    EmailMessage: 'Your username is {username} and temporary password is {####}.'
+                    EmailSubject: 'Your temporary password'
+            SmsConfiguration:
+                ExternalId: !Sub "${AWS::StackName}-external"
+                SnsCallerArn: !GetAtt SMSRole.Arn
+            SmsVerificationMessage: 'Your verification code is {####}.'
+            SmsAuthenticationMessage: 'Your authentication code is {####}.'
+            EmailConfiguration:
+                ReplyToEmailAddress: donotreply@domain.tld
+                EmailSendingAccount: COGNITO_DEFAULT
+            EmailVerificationMessage: 'Your verification code is {####}.'
+            EmailVerificationSubject: 'Your verification code'
+            MfaConfiguration: 'OPTIONAL'
+            AutoVerifiedAttributes:
+              - email
+            UsernameAttributes:
+              - email
+            Policies:
+                PasswordPolicy:
+                    MinimumLength: 12
+                    RequireLowercase: true
+                    RequireNumbers: true
+                    RequireSymbols: true
+                    RequireUppercase: true
+            Schema:
+              - Name: email
+                AttributeDataType: String
+                Mutable: false
+                Required: true
+              - Name: name
+                AttributeDataType: String
+                StringAttributeConstraints:
+                    MaxLength: 255
+                    MinLength: 6
+                Mutable: true
+                Required: true
+
+    UserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        GenerateSecret: false
+        UserPoolId: !Ref UserPool
+
+    IdentityPool:
+        Type: AWS::Cognito::IdentityPool
+        Properties:
+            AllowUnauthenticatedIdentities: false
+            CognitoIdentityProviders:
+              - ProviderName: !GetAtt UserPool.ProviderName
+                ClientId: !Ref UserPoolClient
+
+    SMSRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: 'Allow'
+                    Principal: {Service: ['cognito-idp.amazonaws.com'] }
+                    Action:
+                      - 'sts:AssumeRole'
+            Policies:
+              - PolicyName: cognito-sns-sms
+                PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: 'Allow'
+                        Action:
+                          - 'sns:publish'
+                        Resource:
+                          - '*'
+
+    CognitoAuthorizedRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: 'Allow'
+                    Principal: {Federated: 'cognito-identity.amazonaws.com'}
+                    Action:
+                      - 'sts:AssumeRoleWithWebIdentity'
+                    Condition:
+                        StringEquals:
+                            'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
+                        'ForAnyValue:StringLike':
+                            'cognito-identity.amazonaws.com:amr': 'authenticated'
+            Policies:
+              - PolicyName: CognitoAuthorizedPolicy
+                PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: 'Allow'
+                        Action:
+                          - 'mobileanalytics:PutEvents'
+                          - 'cognito-sync:*'
+                          - 'cognito-identity:*'
+                        Resource:
+                          - '*'
+                      - Effect: 'Allow'
+                        Action:
+                          - 'lambda:InvokeFunction'
+                        Resource:
+                          - '*'
+
+    CognitoUnAuthorizedRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                  - Effect: 'Allow'
+                    Principal: {Federated: 'cognito-identity.amazonaws.com'}
+                    Action:
+                      - 'sts:AssumeRoleWithWebIdentity'
+                    Condition:
+                        StringEquals:
+                            'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
+                        'ForAnyValue:StringLike':
+                            'cognito-identity.amazonaws.com:amr': 'unauthenticated'
+            Policies:
+              - PolicyName: CognitoUnauthorizedPolicy
+                PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: 'Allow'
+                        Action:
+                          - 'mobileanalytics:PutEvents'
+                          - 'cognito-sync:*'
+                        Resource:
+                          - '*'
+
+    IdentityPoolRoleMapping:
+        Type: AWS::Cognito::IdentityPoolRoleAttachment
+        Properties:
+            IdentityPoolId: !Ref IdentityPool
+            Roles:
+                authenticated: !GetAtt CognitoAuthorizedRole.Arn
+                unauthenticated: !GetAtt CognitoUnAuthorizedRole.Arn
+
 Outputs:
-    GetUploadUrlFunctionApi:
-        Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-        Value: !Sub "https://${DomainName}/get-upload-url/"
-        # Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/get-upload-url/"
+    EndpointDomainName:
+        Description: "API Gateway endpoint URL for Prod stage"
+        # Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+        Value: !Sub "https://${DomainName}"
+
+    # Functions
     GetUploadUrlFunction:
         Description: "Get Upload URL Lambda Function ARN"
         Value: !GetAtt GetUploadUrlFunction.Arn
     GetUploadUrlFunctionIamRole:
         Description: "Implicit IAM Role created for Get Upload URL function"
         Value: !GetAtt GetUploadUrlFunctionRole.Arn
+
+    # Authentication
+    UserPoolId:
+        Value: !Ref UserPool
+    UserPoolClientId:
+        Value: !Ref UserPoolClient
+    IdentityPoolId:
+        Value: !Ref IdentityPool

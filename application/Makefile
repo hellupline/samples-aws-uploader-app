@@ -1,4 +1,3 @@
-GLOBAL_STACK_NAME=globals
 STACK_NAME=hellupline-uploader-application
 
 AWS_PROFILE=default
@@ -7,9 +6,9 @@ AWS_REGION=us-east-1
 ARTIFACT_BUCKET_NAME=$$(aws ssm get-parameters \
 		--profile=$(AWS_PROFILE) \
 		--region=$(AWS_REGION) \
-		--names /artifacts-store \
-		--query 'Parameters[].Value' \
-		--output text)
+		--names=/core/build/artifact-store \
+		--query='Parameters[].Value' \
+		--output=text)
 
 
 all: packaged.yaml

@@ -273,18 +273,11 @@ Resources:
                           - 'iam:DeleteRolePolicy'
                           - 'iam:DetachRolePolicy'
                           - 'iam:GetRole'
+                          - 'iam:GetRolePolicy'
                           - 'iam:PassRole'
                           - 'iam:PutRolePolicy'
                         Resource:
                           - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${ParentStackName}-*'
-              - PolicyName: lambda
-                PolicyDocument:
-                    Statement:
-                      - Effect: Allow
-                        Action:
-                          - 'lambda:*'
-                        Resource:
-                          - !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ParentStackName}-*'
               - PolicyName: api-gateway
                 PolicyDocument:
                     Statement:
@@ -308,6 +301,14 @@ Resources:
                           - 'cloudfront:UpdateDistribution'
                         Resource:
                           - '*'
+              - PolicyName: lambda
+                PolicyDocument:
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 'lambda:*'
+                        Resource:
+                          - !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:${ParentStackName}-*'
               - PolicyName: s3
                 PolicyDocument:
                     Statement:
@@ -317,6 +318,16 @@ Resources:
                         Resource:
                           - !Sub 'arn:${AWS::Partition}:s3:::*'
                           - !Sub 'arn:${AWS::Partition}:s3:::*/*'
+              - PolicyName: cognito-idp
+                PolicyDocument:
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 'cognito-identity:*'
+                          - 'idp:*'
+                          - 'cognito-idp:*'
+                        Resource:
+                          - !Sub '*'
 
     ApplicationCodeBuildProject:
         Type: AWS::CodeBuild::Project

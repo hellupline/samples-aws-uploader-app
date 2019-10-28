@@ -20,6 +20,7 @@ def lambda_handler(event, context):
         logging.error(e)
         raise e
 
+
 def generate_url(key_name):
     return s3_client.generate_presigned_url(
         ClientMethod="put_object",
@@ -28,6 +29,7 @@ def generate_url(key_name):
         HttpMethod="PUT",
     )
 
+
 def response_success(body):
     return {
         "statusCode": 200,
@@ -35,7 +37,7 @@ def response_success(body):
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "origin, content-type, accept",
             "Access-Control-Allow-Credentials": "true",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
         },
         "isBase64Encoded": False,
         "body": json.dumps(body),
