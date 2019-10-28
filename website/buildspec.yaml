@@ -6,15 +6,10 @@ phases:
             nodejs: 10
     pre_build:
         commands:
-          - curl --fail-early --fail --show-error --silent --max-time 5 --connect-timeout 3
-                --request GET --location --output jq
-                https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
-          - chmod +x jq
           - npm --prefix ./website ci
     build:
         commands:
-          - export REACT_APP_GET_UPLOAD_URL_FUNCTION_API=$(./jq --raw-output '.GetUploadUrlFunctionApi' "${CODEBUILD_SRC_DIR_ApplicationCloudFormationOutputsAsZip}/ApplicationOutputs.json")
-          - echo REACT_APP_GET_UPLOAD_URL_FUNCTION_API=${REACT_APP_GET_UPLOAD_URL_FUNCTION_API}
+          - jq -Mf ./website/generate-settings.jq < "${CODEBUILD_SRC_DIR_ApplicationCloudFormationOutputsAsZip}/ApplicationOutputs.json" | tee ./website/src/settings.json
           - npm --prefix ./website run build
 
 artifacts:
