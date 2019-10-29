@@ -5,7 +5,7 @@ import { useDropzone } from 'react-dropzone';
 import axios from 'axios';
 
 import { withAuthenticator } from 'aws-amplify-react';
-import Amplify, { API } from 'aws-amplify';
+import Amplify, { API, Auth } from 'aws-amplify';
 
 import ProgressBar from 'react-bootstrap/ProgressBar';
 import Button from 'react-bootstrap/Button';
@@ -57,7 +57,9 @@ function FileUploader({ file }) {
 
     const handleCancelClick = () => requestCancel.cancel('Operation canceled by the user.');
 
-    useEffect(() => uploadFile(file, setState, setProgress, requestCancel), [file, requestCancel]);
+    useEffect(() => {
+        uploadFile(file, setState, setProgress, requestCancel);
+    }, [file, requestCancel]);
 
     const total = Math.round((progress * 100) / file.size);
     return (
@@ -85,8 +87,15 @@ function FileUploader({ file }) {
 
 async function uploadFile(file, setState, setProgress, requestCancel) {
     try {
-        const res = await API.post('uploader', '/get-upload-url');
+        const idToken = (await Auth.currentSession()).getIdToken().getJwtToken();
+        const args = {
+            headers: {
+                Authorization: `Bearer ${idToken}`,
+            },
+        };
+        const res = await API.get('uploader', '/create-upload-url', args);
         const { upload_url: uploadUrl } = res;
+
         setState('in-progress');
         await axios.put(uploadUrl, file, {
             onUploadProgress: (e) => setProgress(e.loaded),

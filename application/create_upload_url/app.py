@@ -11,6 +11,7 @@ KEY_PREFIX = os.environ["KEY_PREFIX"]
 EXPIRATION = 1200
 s3_client = boto3.client("s3")
 
+
 def lambda_handler(event, context):
     try:
         key = str(uuid.uuid4())

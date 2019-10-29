@@ -28,10 +28,10 @@ Resources:
     #
     # Functions
     #
-    GetUploadUrlFunction:
+    CreateUploadUrlFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: get_upload_url/
+            CodeUri: create_upload_url/
             Handler: app.lambda_handler
             Runtime: python3.7
             Timeout: 3
@@ -40,14 +40,14 @@ Resources:
                     BUCKET_NAME: !Ref UploadBucket
                     KEY_PREFIX: "romes"
             Events:
-                GetUploadUrl:
+                CreateUploadUrl:
                     Type: Api
                     Properties:
-                        Path: /get-upload-url
-                        Method: GET
+                        Path: /create-upload-url
+                        Method: POST
                         RestApiId: !Ref RestApi
-                        # Auth:
-                        #     Authorizer: NONE
+                        Auth:
+                            Authorizer: CognitoAuthorizer
             Policies:
               - Version: '2012-10-17'
                 Statement:
@@ -70,17 +70,17 @@ Resources:
                 AllowOrigin: "'*'"
                 MaxAge: "'600'"
                 AllowCredentials: "'true'"
-            # Auth:
-            #     DefaultAuthorizer: CognitoAuthorizer
-            #     Authorizers:
-            #         CognitoAuthorizer:
-            #             UserPoolArn: !GetAtt UserPool.Arn
-            # MethodSettings:
-            #   - HttpMethod: "*"
-            #     ResourcePath: "/*"
-            #     LoggingLevel: INFO
-            #     DataTraceEnabled: true
-            #     MetricsEnabled: true
+            Auth:
+                # DefaultAuthorizer: CognitoAuthorizer
+                Authorizers:
+                    CognitoAuthorizer:
+                        UserPoolArn: !GetAtt UserPool.Arn
+            MethodSettings:
+              - HttpMethod: "*"
+                ResourcePath: "/*"
+                LoggingLevel: INFO
+                DataTraceEnabled: true
+                MetricsEnabled: true
 
     RestApiDomainName:
         Type: AWS::ApiGateway::DomainName
@@ -159,12 +159,12 @@ Resources:
                     RequireSymbols: true
                     RequireUppercase: true
             Schema:
-              - Name: email
-                AttributeDataType: String
+              - AttributeDataType: String
+                Name: email
                 Mutable: false
                 Required: true
-              - Name: name
-                AttributeDataType: String
+              - AttributeDataType: String
+                Name: name
                 StringAttributeConstraints:
                     MaxLength: 255
                     MinLength: 6
@@ -174,8 +174,10 @@ Resources:
     UserPoolClient:
       Type: AWS::Cognito::UserPoolClient
       Properties:
-        GenerateSecret: false
         UserPoolId: !Ref UserPool
+        GenerateSecret: false
+        ExplicitAuthFlows:
+            - USER_PASSWORD_AUTH
 
     IdentityPool:
         Type: AWS::Cognito::IdentityPool
@@ -281,12 +283,12 @@ Outputs:
         Value: !Sub "https://${DomainName}"
 
     # Functions
-    GetUploadUrlFunction:
+    CreateUploadUrlFunction:
         Description: "Get Upload URL Lambda Function ARN"
-        Value: !GetAtt GetUploadUrlFunction.Arn
-    GetUploadUrlFunctionIamRole:
-        Description: "Implicit IAM Role created for Get Upload URL function"
-        Value: !GetAtt GetUploadUrlFunctionRole.Arn
+        Value: !GetAtt CreateUploadUrlFunction.Arn
+    CreateUploadUrlFunctionIamRole:
+        Description: "Implicit IAM Role created for CreateUploadUrlFunction"
+        Value: !GetAtt CreateUploadUrlFunctionRole.Arn
 
     # Authentication
     UserPoolId:
