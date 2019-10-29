@@ -87,13 +87,13 @@ function FileUploader({ file }) {
 
 async function uploadFile(file, setState, setProgress, requestCancel) {
     try {
-        const idToken = (await Auth.currentSession()).getIdToken().getJwtToken();
+        const token = (await Auth.currentSession()).getIdToken().getJwtToken();
         const args = {
             headers: {
-                Authorization: `Bearer ${idToken}`,
+                Authorization: `Bearer ${token}`,
             },
         };
-        const res = await API.get('uploader', '/create-upload-url', args);
+        const res = await API.post('uploader', '/create-upload-url', args);
         const { upload_url: uploadUrl } = res;
 
         setState('in-progress');

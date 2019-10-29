@@ -38,7 +38,7 @@ Resources:
             Environment:
                 Variables:
                     BUCKET_NAME: !Ref UploadBucket
-                    KEY_PREFIX: "romes"
+                    KEY_PREFIX: "user-files"
             Events:
                 CreateUploadUrl:
                     Type: Api

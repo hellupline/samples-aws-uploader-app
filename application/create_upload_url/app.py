@@ -13,13 +13,19 @@ s3_client = boto3.client("s3")
 
 
 def lambda_handler(event, context):
+    key = os.path.join(KEY_PREFIX, get_user_prefix(event), str(uuid.uuid4()))
+
     try:
-        key = str(uuid.uuid4())
-        response = generate_url(os.path.join(KEY_PREFIX, key))
+        response = generate_url(key)
         return response_success({"upload_url": response})
     except ClientError as e:
         logging.error(e)
         raise e
+
+
+def get_user_prefix(event):
+    # return event["requestContext"]["authorizer"]["claims"]["cognito:username"]
+    return event["requestContext"]["authorizer"]["claims"]["email"]
 
 
 def generate_url(key_name):
