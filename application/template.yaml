@@ -39,6 +39,7 @@ Resources:
                 Variables:
                     BUCKET_NAME: !Ref UploadBucket
                     KEY_PREFIX: "user-files"
+                    TABLE_NAME: !Ref UploadTable
             Events:
                 CreateUploadUrl:
                     Type: Api
@@ -51,6 +52,11 @@ Resources:
             Policies:
               - Version: '2012-10-17'
                 Statement:
+                  - Effect: Allow
+                    Action:
+                      - 'dynamodb:PutItem'
+                    Resource:
+                      - !Sub '${UploadTable.Arn}'
                   - Effect: Allow
                     Action:
                       - 's3:PutObject'
@@ -123,6 +129,12 @@ Resources:
                     AbortIncompleteMultipartUpload:
                         DaysAfterInitiation: 5
 
+    UploadTable:
+        Type: AWS::Serverless::SimpleTable
+        Properties:
+            PrimaryKey:
+                Name: id
+                Type: String
 
     #
     # Authentication

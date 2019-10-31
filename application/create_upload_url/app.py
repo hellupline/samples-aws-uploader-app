@@ -1,35 +1,50 @@
 import json
 import uuid
 import os
-import logging
 
-from botocore.exceptions import ClientError
 import boto3
+
 
 BUCKET_NAME = os.environ["BUCKET_NAME"]
 KEY_PREFIX = os.environ["KEY_PREFIX"]
+TABLE_NAME = os.environ["TABLE_NAME"]
 EXPIRATION = 1200
-s3_client = boto3.client("s3")
+
+s3 = boto3.client("s3")
+dynamodb = boto3.resource("dynamodb")
+table = dynamodb.Table(TABLE_NAME)
 
 
 def lambda_handler(event, context):
     key = os.path.join(KEY_PREFIX, get_user_prefix(event), str(uuid.uuid4()))
-
-    try:
-        response = generate_url(key)
-        return response_success({"upload_url": response})
-    except ClientError as e:
-        logging.error(e)
-        raise e
+    fname = event["queryStringParameters"].get("name", key)
+    ftype = event["queryStringParameters"].get("type", "octet/stream")
+    size = event["queryStringParameters"].get("size", "0")
+    if not size.isnumeric():
+        raise TypeError(f"expected 'size' to be int, got {type(size)}")
+    table.put_item(
+        Item={
+            "id": key,
+            "owner": get_username(event),
+            "name": fname,
+            "type": ftype,
+            "size": size,
+        }
+    )
+    response = generate_url(key, ftype)
+    return response_success({"upload_url": response})
 
 
 def get_user_prefix(event):
-    # return event["requestContext"]["authorizer"]["claims"]["cognito:username"]
     return event["requestContext"]["authorizer"]["claims"]["email"]
 
 
-def generate_url(key_name):
-    return s3_client.generate_presigned_url(
+def get_username(event):
+    return event["requestContext"]["authorizer"]["claims"]["cognito:username"]
+
+
+def generate_url(key_name, content_type):
+    return s3.generate_presigned_url(
         ClientMethod="put_object",
         Params={"Bucket": BUCKET_NAME, "Key": key_name, "ACL": "private"},
         ExpiresIn=EXPIRATION,

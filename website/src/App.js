@@ -1,11 +1,10 @@
-import React, {
-    useState, useEffect, useCallback, useMemo,
-} from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import axios from 'axios';
-
 import { withAuthenticator } from 'aws-amplify-react';
 import Amplify, { API, Auth } from 'aws-amplify';
+
+import { useDropzone } from 'react-dropzone';
 
 import ProgressBar from 'react-bootstrap/ProgressBar';
 import Button from 'react-bootstrap/Button';
@@ -31,7 +30,7 @@ export default withAuthenticator(App);
 
 
 function UploadDropzone() {
-    const [files, setFiles] = useState([]);
+    const [files, setFiles] = React.useState([]);
 
     const onDrop = useCallback((acceptedFiles) => {
         setFiles([...files, ...acceptedFiles]);
@@ -50,8 +49,8 @@ function UploadDropzone() {
 }
 
 function FileUploader({ file }) {
-    const [state, setState] = useState('standby');
-    const [progress, setProgress] = useState(0);
+    const [state, setState] = React.useState('standby');
+    const [progress, setProgress] = React.useState(0);
 
     const requestCancel = useMemo(() => axios.CancelToken.source(), []);
 
@@ -84,6 +83,10 @@ function FileUploader({ file }) {
     );
 }
 
+FileUploader.propTypes = {
+    file: PropTypes.object.isRequired,
+};
+
 
 async function uploadFile(file, setState, setProgress, requestCancel) {
     try {
@@ -91,6 +94,12 @@ async function uploadFile(file, setState, setProgress, requestCancel) {
         const args = {
             headers: {
                 Authorization: `Bearer ${token}`,
+            },
+            body: {},
+            queryStringParameters: {
+                name: file.name,
+                type: file.type,
+                size: file.size,
             },
         };
         const res = await API.post('uploader', '/create-upload-url', args);
