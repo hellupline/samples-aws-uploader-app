@@ -130,11 +130,25 @@ Resources:
                         DaysAfterInitiation: 5
 
     UploadTable:
-        Type: AWS::Serverless::SimpleTable
+        Type: AWS::DynamoDB::Table
         Properties:
-            PrimaryKey:
-                Name: id
-                Type: String
+            BillingMode: PAY_PER_REQUEST
+            AttributeDefinitions:
+              - {AttributeName: "UserId", AttributeType: "S"}
+              - {AttributeName: "StorageKey", AttributeType: "S"}
+              - {AttributeName: "Filename", AttributeType: "S"}
+            KeySchema:
+              - {AttributeName: "UserId", KeyType: "HASH"}
+              - {AttributeName: "StorageKey", KeyType: "RANGE"}
+            LocalSecondaryIndexes:
+              - IndexName: "Path"
+                KeySchema:
+                  - {AttributeName: "UserId", KeyType: "HASH"}
+                  - {AttributeName: "Filename", KeyType: "RANGE"}
+                Projection:
+                    NonKeyAttributes:
+                      - "StorageKey"
+                    ProjectionType: INCLUDE
 
     #
     # Authentication

@@ -98,7 +98,7 @@ async function uploadFile(file, setState, setProgress, requestCancel) {
             body: {},
             queryStringParameters: {
                 name: file.name,
-                type: file.type,
+                content_type: file.type,
                 size: file.size,
             },
         };

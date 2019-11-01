@@ -1,6 +1,8 @@
+import datetime
 import json
-import uuid
 import os
+import uuid
+import typing as T
 
 import boto3
 
@@ -16,34 +18,38 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 def lambda_handler(event, context):
-    key = os.path.join(KEY_PREFIX, get_user_prefix(event), str(uuid.uuid4()))
-    fname = event["queryStringParameters"].get("name", key)
-    ftype = event["queryStringParameters"].get("type", "octet/stream")
-    size = event["queryStringParameters"].get("size", "0")
-    if not size.isnumeric():
-        raise TypeError(f"expected 'size' to be int, got {type(size)}")
-    table.put_item(
-        Item={
-            "id": key,
-            "owner": get_username(event),
-            "name": fname,
-            "type": ftype,
-            "size": size,
-        }
-    )
-    response = generate_url(key, ftype)
+    username = get_username(event)
+    key = os.path.join(KEY_PREFIX, username, str(uuid.uuid4()))
+    name, content_type, size = get_file_data(event, key)
+    item = {
+        "UserId": username,
+        "StorageKey": key,
+        "Filename": name,
+        "ContentType": content_type,
+        "Size": size,
+        "CreatedAt": datetime.datetime.now(tz=datetime.timezone.utc),
+        "UpdatedAt": datetime.datetime.now(tz=datetime.timezone.utc),
+    }
+
+    table.put_item(Item=item)
+    response = generate_url(key)
     return response_success({"upload_url": response})
 
 
-def get_user_prefix(event):
-    return event["requestContext"]["authorizer"]["claims"]["email"]
-
-
-def get_username(event):
+def get_username(event) -> str:
     return event["requestContext"]["authorizer"]["claims"]["cognito:username"]
 
 
-def generate_url(key_name, content_type):
+def get_file_data(event, key) -> T.Tuple[str, str, str]:
+    name = event["queryStringParameters"].get("name") or key
+    content_type = event["queryStringParameters"].get("content_type") or "octet/stream"
+    size = event["queryStringParameters"].get("size") or "0"
+    if not size.isnumeric():
+        raise TypeError(f"expected 'size' to be int, got {type(size)}")
+    return name, content_type, size
+
+
+def generate_url(key_name) -> str:
     return s3.generate_presigned_url(
         ClientMethod="put_object",
         Params={"Bucket": BUCKET_NAME, "Key": key_name, "ACL": "private"},
