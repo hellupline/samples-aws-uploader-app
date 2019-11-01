@@ -97,7 +97,7 @@ async function uploadFile(file, setState, setProgress, requestCancel) {
             },
             body: {},
             queryStringParameters: {
-                name: file.name,
+                filename: file.name,
                 content_type: file.type,
                 size: file.size,
             },
@@ -109,7 +109,7 @@ async function uploadFile(file, setState, setProgress, requestCancel) {
         await axios.put(uploadUrl, file, {
             onUploadProgress: (e) => setProgress(e.loaded),
             cancelToken: requestCancel.token,
-            headers: { 'Content-Type': '' },
+            headers: { 'Content-Type': file.type },
         });
         setState('completed');
     } catch (ex) {

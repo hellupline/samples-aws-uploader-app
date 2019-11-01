@@ -120,7 +120,7 @@ Resources:
                     AllowedMethods: ['GET', 'POST', 'PUT']
                     AllowedHeaders: ['*']
                     AllowedOrigins: ['*']
-                    ExposedHeaders: ['Date']
+                    ExposedHeaders: ['ContentType', 'Date']
                     MaxAge: 3600
             LifecycleConfiguration:
                 Rules:
