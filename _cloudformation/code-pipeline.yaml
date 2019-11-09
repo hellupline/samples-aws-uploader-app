@@ -167,19 +167,19 @@ Resources:
                         UserParameters: !Ref CloudFrontDistributionId
                     RunOrder: 1
 
-    # PipelineWebhook:
-    #     Type: AWS::CodePipeline::Webhook
-    #     Properties:
-    #         TargetPipeline: !Ref Pipeline
-    #         TargetPipelineVersion: !GetAtt Pipeline.Version
-    #         TargetAction: SourceGithub
-    #         RegisterWithThirdParty: true
-    #         Authentication: GITHUB_HMAC
-    #         AuthenticationConfiguration:
-    #             SecretToken: !Ref GithubToken
-    #         Filters:
-    #           - JsonPath: "$.ref"
-    #             MatchEquals: refs/heads/{Branch}
+    PipelineWebhook:
+        Type: AWS::CodePipeline::Webhook
+        Properties:
+            TargetPipeline: !Ref Pipeline
+            TargetPipelineVersion: !GetAtt Pipeline.Version
+            TargetAction: SourceGithub
+            RegisterWithThirdParty: true
+            Authentication: GITHUB_HMAC
+            AuthenticationConfiguration:
+                SecretToken: !Ref GithubToken
+            Filters:
+              - JsonPath: "$.ref"
+                MatchEquals: refs/heads/{Branch}
 
     CodePipelineRole:
         Type: AWS::IAM::Role
@@ -219,10 +219,6 @@ Resources:
                           - 'cloudformation:DeleteStack'
                         Resource:
                           - !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ParentStackName}-application/*'
-              - PolicyName: iam
-                PolicyDocument:
-                    Version: '2012-10-17'
-                    Statement:
                       - Effect: Allow
                         Action:
                           - 'iam:PassRole'
@@ -293,7 +289,7 @@ Resources:
                           - !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}::/domainnames/*'
                           - !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis'
                           - !Sub 'arn:${AWS::Partition}:apigateway:${AWS::Region}::/restapis/*'
-              - PolicyName: cloudfront
+              - PolicyName: cloudfront-domain
                 PolicyDocument:
                     Statement:
                       - Effect: Allow

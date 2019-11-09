@@ -3,11 +3,6 @@ STACK_NAME=hellupline-uploader
 AWS_PROFILE=default
 AWS_REGION=us-east-1
 
-APPLICATION_ARM_CERTIFICATION_ARN=
-APPLICATION_DOMAIN_NAME=
-WEBSITE_ARM_CERTIFICATION_ARN=
-WEBSITE_DOMAIN_NAME=
-
 ARTIFACT_BUCKET_NAME=$$(aws ssm get-parameters \
 		--profile=$(AWS_PROFILE) \
 		--region=$(AWS_REGION) \
@@ -15,20 +10,18 @@ ARTIFACT_BUCKET_NAME=$$(aws ssm get-parameters \
 		--query='Parameters[].Value' \
 		--output=text)
 
+.PHONY: all deploy status
 
-all: packaged.yaml
+all: | deploy status
+
+deploy: packaged.yaml
 	aws cloudformation deploy \
 		--profile=$(AWS_PROFILE) \
 		--region=$(AWS_REGION) \
 		--capabilities=CAPABILITY_NAMED_IAM \
 		--no-fail-on-empty-changeset \
 		--stack-name=$(STACK_NAME) \
-		--template-file=$< \
-		--parameter-overrides \
-			ApplicationAcmCertificateArn="$(APPLICATION_ARM_CERTIFICATION_ARN)" \
-			ApplicationDomainName="$(APPLICATION_DOMAIN_NAME)"\
-			WebsiteAcmCertificateArn="$(WEBSITE_ARM_CERTIFICATION_ARN)" \
-			WebsiteDomainName="$(WEBSITE_DOMAIN_NAME)"
+		--template-file=$<
 
 packaged.yaml: template.yaml code-pipeline.yaml website.yaml
 	aws cloudformation package \
@@ -38,3 +31,17 @@ packaged.yaml: template.yaml code-pipeline.yaml website.yaml
 		--s3-prefix=cf-packages \
 		--template-file=$< \
 		--output-template-file=$@
+
+status:
+	@aws cloudformation describe-stack-resources \
+		--profile=$(AWS_PROFILE) \
+		--region=$(AWS_REGION) \
+		--stack-name=$(STACK_NAME) \
+		--query='StackResources[].{LogicalResourceId: LogicalResourceId, PhysicalResourceId: PhysicalResourceId, ResourceStatus: ResourceStatus}' \
+		--output=table
+	@aws cloudformation describe-stacks \
+		--profile=$(AWS_PROFILE) \
+		--region=$(AWS_REGION) \
+		--stack-name=$(STACK_NAME) \
+		--query="Stacks[].Outputs[].{OutputKey: OutputKey, Description: Description, OutputValue: OutputValue}" \
+		--output table
