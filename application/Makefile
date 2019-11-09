@@ -14,9 +14,11 @@ USERNAME=
 PASSWORD=
 USER_POOL_CLIENT_ID=
 
-.PHONY: all cognito-login
+.PHONY: all deploy resources status events cognito-login
 
-all: packaged.yaml
+all: | deploy resources status events
+
+deploy: packaged.yaml
 	aws cloudformation deploy \
 		--profile=$(AWS_PROFILE) \
 		--region=$(AWS_REGION) \
@@ -43,3 +45,27 @@ cognito-login:
 		--client-id=$(USER_POOL_CLIENT_ID) \
 		--query AuthenticationResult.IdToken \
 		--output=text
+
+resouces:
+	@aws cloudformation describe-stack-resources \
+		--profile=$(AWS_PROFILE) \
+		--region=$(AWS_REGION) \
+		--stack-name=$(STACK_NAME) \
+		--query='StackResources[].{LogicalResourceId: LogicalResourceId, PhysicalResourceId: PhysicalResourceId, ResourceStatus: ResourceStatus}' \
+		--output=table
+
+status:
+	@aws cloudformation describe-stacks \
+		--profile=$(AWS_PROFILE) \
+		--region=$(AWS_REGION) \
+		--stack-name=$(STACK_NAME) \
+		--query='Stacks[].Outputs[].{OutputKey: OutputKey, Description: Description, OutputValue: OutputValue}' \
+		--output=table
+
+events:
+	@aws cloudformation describe-stack-events \
+		--profile=$(AWS_PROFILE) \
+		--region=$(AWS_REGION) \
+		--stack-name=$(STACK_NAME) \
+		--query='StackEvents[].{LogicalResourceId: LogicalResourceId, ResourceType: ResourceType, ResourceStatus: ResourceStatus}' \
+		--output=table
