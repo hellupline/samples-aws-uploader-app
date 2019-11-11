@@ -17,7 +17,7 @@ dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 
 
-def lambda_handler(event, context):
+def lambda_handler(event, context) -> T.Dict[str, T.Any]:
     username = get_username(event)
     key = os.path.join(KEY_PREFIX, username, str(uuid.uuid4()))
     filename, content_type, size = get_file_data(event, key)
@@ -63,7 +63,7 @@ def generate_url(key_name, content_type) -> str:
     )
 
 
-def response_success(body):
+def response_success(body) -> T.Dict[str, T.Any]:
     return {
         "statusCode": 200,
         "headers": {

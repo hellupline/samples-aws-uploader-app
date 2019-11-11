@@ -38,7 +38,7 @@ Resources:
             Environment:
                 Variables:
                     BUCKET_NAME: !Ref UploadBucket
-                    KEY_PREFIX: "user-files"
+                    KEY_PREFIX: 'user-files'
                     TABLE_NAME: !Ref UploadTable
             Events:
                 CreateUploadUrl:
@@ -56,13 +56,12 @@ Resources:
                     Action:
                       - 'dynamodb:PutItem'
                     Resource:
-                      - !Sub '${UploadTable.Arn}'
+                      - !GetAtt UploadTable.Arn
                   - Effect: Allow
                     Action:
                       - 's3:PutObject'
                     Resource:
                       - !Sub '${UploadBucket.Arn}/*'
-
     #
     # Api
     #
@@ -82,8 +81,8 @@ Resources:
                     CognitoAuthorizer:
                         UserPoolArn: !GetAtt UserPool.Arn
             MethodSettings:
-              - HttpMethod: "*"
-                ResourcePath: "/*"
+              - HttpMethod: '*'
+                ResourcePath: '/*'
                 LoggingLevel: INFO
                 DataTraceEnabled: true
                 MetricsEnabled: true
@@ -134,20 +133,19 @@ Resources:
         Properties:
             BillingMode: PAY_PER_REQUEST
             AttributeDefinitions:
-              - {AttributeName: "UserId", AttributeType: "S"}
-              - {AttributeName: "StorageKey", AttributeType: "S"}
-              - {AttributeName: "Filename", AttributeType: "S"}
+              - {AttributeName: 'StorageKey', AttributeType: 'S'}
+              - {AttributeName: 'UserId', AttributeType: 'S'}
+              - {AttributeName: 'Filename', AttributeType: 'S'}
             KeySchema:
-              - {AttributeName: "UserId", KeyType: "HASH"}
-              - {AttributeName: "StorageKey", KeyType: "RANGE"}
-            LocalSecondaryIndexes:
-              - IndexName: "Path"
+              - {AttributeName: 'StorageKey', KeyType: 'HASH'}
+            GlobalSecondaryIndexes:
+              - IndexName: 'Path'
                 KeySchema:
-                  - {AttributeName: "UserId", KeyType: "HASH"}
-                  - {AttributeName: "Filename", KeyType: "RANGE"}
+                  - {AttributeName: 'UserId', KeyType: 'HASH'}
+                  - {AttributeName: 'Filename', KeyType: 'RANGE'}
                 Projection:
                     NonKeyAttributes:
-                      - "StorageKey"
+                      - 'StorageKey'
                     ProjectionType: INCLUDE
 
     #
@@ -163,7 +161,7 @@ Resources:
                     EmailMessage: 'Your username is {username} and temporary password is {####}.'
                     EmailSubject: 'Your temporary password'
             SmsConfiguration:
-                ExternalId: !Sub "${AWS::StackName}-external"
+                ExternalId: !Sub '${AWS::StackName}-external'
                 SnsCallerArn: !GetAtt SMSRole.Arn
             SmsVerificationMessage: 'Your verification code is {####}.'
             SmsAuthenticationMessage: 'Your authentication code is {####}.'
@@ -261,11 +259,18 @@ Resources:
                           - 'cognito-identity:*'
                         Resource:
                           - '*'
+              - PolicyName: dynamodb-list-own-keys
+                PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
                       - Effect: 'Allow'
                         Action:
-                          - 'lambda:InvokeFunction'
+                          - 'dynamodb:GetBatchItem'
+                          - 'dynamodb:GetItem'
+                          - 'dynamodb:Scan'
+                          - 'dynamodb:Query'
                         Resource:
-                          - '*'
+                          - !GetAtt UploadTable.Arn
 
     CognitoUnAuthorizedRole:
         Type: AWS::IAM::Role
@@ -304,17 +309,25 @@ Resources:
 
 Outputs:
     EndpointDomainName:
-        Description: "API Gateway endpoint URL for Prod stage"
-        # Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
-        Value: !Sub "https://${DomainName}"
+        Description: 'API Gateway endpoint URL for Prod stage'
+        # Value: !Sub 'https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/'
+        Value: !Sub 'https://${DomainName}'
 
     # Functions
     CreateUploadUrlFunction:
-        Description: "Get Upload URL Lambda Function ARN"
+        Description: 'Get Upload URL Lambda Function ARN'
         Value: !GetAtt CreateUploadUrlFunction.Arn
     CreateUploadUrlFunctionIamRole:
-        Description: "Implicit IAM Role created for CreateUploadUrlFunction"
+        Description: 'Implicit IAM Role created for CreateUploadUrlFunction'
         Value: !GetAtt CreateUploadUrlFunctionRole.Arn
+
+    # Storage
+    UploadBucket:
+        Description: 'Bucket where files are stored'
+        Value: !GetAtt UploadBucket.Arn
+    UploadTable:
+        Description: 'Table where metadata are stored'
+        Value: !GetAtt UploadTable.Arn
 
     # Authentication
     UserPoolId:
