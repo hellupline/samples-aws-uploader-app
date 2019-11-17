@@ -1,6 +1,7 @@
-import React, { useEffect, useCallback, useMemo } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
+
 import { withAuthenticator } from 'aws-amplify-react';
 import Amplify, { API, Auth } from 'aws-amplify';
 
@@ -26,13 +27,13 @@ function App() {
     );
 }
 
-export default withAuthenticator(App);
+export default withAuthenticator(App, { includeGreetings: true });
 
 
 function UploadDropzone() {
     const [files, setFiles] = React.useState([]);
 
-    const onDrop = useCallback((acceptedFiles) => {
+    const onDrop = React.useCallback((acceptedFiles) => {
         setFiles([...files, ...acceptedFiles]);
     }, [files]);
     const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
@@ -48,15 +49,16 @@ function UploadDropzone() {
     );
 }
 
+
 function FileUploader({ file }) {
     const [state, setState] = React.useState('standby');
     const [progress, setProgress] = React.useState(0);
 
-    const requestCancel = useMemo(() => axios.CancelToken.source(), []);
+    const requestCancel = React.useMemo(() => axios.CancelToken.source(), []);
 
     const handleCancelClick = () => requestCancel.cancel('Operation canceled by the user.');
 
-    useEffect(() => {
+    React.useEffect(() => {
         uploadFile(file, setState, setProgress, requestCancel);
     }, [file, requestCancel]);
 

@@ -5,7 +5,6 @@
         "Auth": {
             # "region": ($ENV.AWS_REGION // "us-east-1"),
             "region": "us-east-1",
-            "identityPoolId": .IdentityPoolId,
             "userPoolId": .UserPoolId,
             "userPoolWebClientId": .UserPoolClientId
         },
@@ -17,5 +16,7 @@
                 }
             ]
         }
-    }
+    },
+    "DynamoDB": { "UploadTable": .UploadTable, "region": "us-east-1" },
+    "S3": { "UploadBucket": .UploadTable, "region": "us-east-1" }
 }

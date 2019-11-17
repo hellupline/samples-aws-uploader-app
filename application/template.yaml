@@ -7,12 +7,19 @@ Description: 'HellUpLine Uploader Application'
 Metadata:
     AWS::CloudFormation::Interface:
         ParameterGroups:
+          - Label: {default: 'Application Parameters'}
+            Parameters:
+              - KeyPrefix
           - Label: {default: 'Api Parameters'}
             Parameters:
               - AcmCertificateArn
               - DomainName
 
 Parameters:
+    KeyPrefix:
+        Description: 'Prefix used in s3 bucket to store user files'
+        Type: String
+        Default: 'user-files'
     AcmCertificateArn:
         Description: 'The ARN of the SSL certificate to use for the ApiGateway.'
         Type: String
@@ -28,23 +35,51 @@ Resources:
     #
     # Functions
     #
-    CreateUploadUrlFunction:
+    ListObjectsFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: create_upload_url/
-            Handler: app.lambda_handler
+            CodeUri: objects_api
+            Handler: list_objects.lambda_handler
+            Runtime: python3.7
+            Timeout: 3
+            Environment:
+                Variables:
+                    TABLE_NAME: !Ref UploadTable
+            Events:
+                CreateObjectd:
+                    Type: Api
+                    Properties:
+                        Path: /objects
+                        Method: GET
+                        RestApiId: !Ref RestApi
+                        Auth:
+                            Authorizer: CognitoAuthorizer
+            Policies:
+              - Version: '2012-10-17'
+                Statement:
+                  - Effect: Allow
+                    Action:
+                      - 'dynamodb:Query'
+                    Resource:
+                      - !GetAtt UploadTable.Arn
+
+    CreateObjectFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            CodeUri: objects_api
+            Handler: create_object.lambda_handler
             Runtime: python3.7
             Timeout: 3
             Environment:
                 Variables:
                     BUCKET_NAME: !Ref UploadBucket
-                    KEY_PREFIX: 'user-files'
+                    KEY_PREFIX: !Ref KeyPrefix
                     TABLE_NAME: !Ref UploadTable
             Events:
-                CreateUploadUrl:
+                CreateObjectd:
                     Type: Api
                     Properties:
-                        Path: /create-upload-url
+                        Path: /objects
                         Method: POST
                         RestApiId: !Ref RestApi
                         Auth:
@@ -61,7 +96,7 @@ Resources:
                     Action:
                       - 's3:PutObject'
                     Resource:
-                      - !Sub '${UploadBucket.Arn}/*'
+                      - !Sub '${UploadBucket.Arn}/${KeyPrefix}/*'
     #
     # Api
     #
@@ -133,67 +168,68 @@ Resources:
         Properties:
             BillingMode: PAY_PER_REQUEST
             AttributeDefinitions:
-              - {AttributeName: 'StorageKey', AttributeType: 'S'}
-              - {AttributeName: 'UserId', AttributeType: 'S'}
-              - {AttributeName: 'Filename', AttributeType: 'S'}
+              # - {AttributeName: 'storage_key', AttributeType: 'S'}
+              - {AttributeName: 'user_id', AttributeType: 'S'}
+              - {AttributeName: 'filename', AttributeType: 'S'}
             KeySchema:
-              - {AttributeName: 'StorageKey', KeyType: 'HASH'}
-            GlobalSecondaryIndexes:
-              - IndexName: 'Path'
-                KeySchema:
-                  - {AttributeName: 'UserId', KeyType: 'HASH'}
-                  - {AttributeName: 'Filename', KeyType: 'RANGE'}
-                Projection:
-                    NonKeyAttributes:
-                      - 'StorageKey'
-                    ProjectionType: INCLUDE
+              - {AttributeName: 'user_id', KeyType: 'HASH'}
+              - {AttributeName: 'filename', KeyType: 'RANGE'}
+            # GlobalSecondaryIndexes:
+            #   - IndexName: 'storage'
+            #     KeySchema:
+            #       - {AttributeName: 'storage_key', KeyType: 'HASH'}
+            #     Projection:
+            #         NonKeyAttributes:
+            #           - 'user_id'
+            #           - 'filename'
+            #         ProjectionType: INCLUDE
 
     #
     # Authentication
     #
     UserPool:
         Type: AWS::Cognito::UserPool
-        Properties:
-            AdminCreateUserConfig:
-                AllowAdminCreateUserOnly: true
-                UnusedAccountValidityDays: 30
-                InviteMessageTemplate:
-                    EmailMessage: 'Your username is {username} and temporary password is {####}.'
-                    EmailSubject: 'Your temporary password'
-            SmsConfiguration:
-                ExternalId: !Sub '${AWS::StackName}-external'
-                SnsCallerArn: !GetAtt SMSRole.Arn
-            SmsVerificationMessage: 'Your verification code is {####}.'
-            SmsAuthenticationMessage: 'Your authentication code is {####}.'
-            EmailConfiguration:
-                ReplyToEmailAddress: donotreply@domain.tld
-                EmailSendingAccount: COGNITO_DEFAULT
-            EmailVerificationMessage: 'Your verification code is {####}.'
-            EmailVerificationSubject: 'Your verification code'
-            MfaConfiguration: 'OPTIONAL'
-            AutoVerifiedAttributes:
-              - email
-            UsernameAttributes:
-              - email
-            Policies:
-                PasswordPolicy:
-                    MinimumLength: 12
-                    RequireLowercase: true
-                    RequireNumbers: true
-                    RequireSymbols: true
-                    RequireUppercase: true
-            Schema:
-              - AttributeDataType: String
-                Name: email
-                Mutable: false
-                Required: true
-              - AttributeDataType: String
-                Name: name
-                StringAttributeConstraints:
-                    MaxLength: 255
-                    MinLength: 6
-                Mutable: true
-                Required: true
+        # Properties:
+        #     AdminCreateUserConfig:
+        #         AllowAdminCreateUserOnly: true
+        #         UnusedAccountValidityDays: 30
+        #         InviteMessageTemplate:
+        #             EmailMessage: 'Your username is {username} and temporary password is {####}.'
+        #             EmailSubject: 'Your temporary password'
+        #     SmsConfiguration:
+        #         ExternalId: !Sub '${AWS::StackName}-external'
+        #         SnsCallerArn: !GetAtt SMSRole.Arn
+        #     SmsVerificationMessage: 'Your verification code is {####}.'
+        #     SmsAuthenticationMessage: 'Your authentication code is {####}.'
+        #     EmailConfiguration:
+        #         ReplyToEmailAddress: donotreply@domain.tld
+        #         EmailSendingAccount: COGNITO_DEFAULT
+        #     EmailVerificationMessage: 'Your verification code is {####}.'
+        #     EmailVerificationSubject: 'Your verification code'
+        #     MfaConfiguration: 'OPTIONAL'
+        #     AutoVerifiedAttributes:
+        #       - email
+        #     UsernameAttributes:
+        #       - email
+        #     Policies:
+        #         PasswordPolicy:
+        #             MinimumLength: 12
+        #             RequireLowercase: true
+        #             RequireNumbers: true
+        #             RequireSymbols: true
+        #             RequireUppercase: true
+        #     Schema:
+        #       - AttributeDataType: String
+        #         Name: email
+        #         Mutable: false
+        #         Required: true
+        #       - AttributeDataType: String
+        #         Name: name
+        #         StringAttributeConstraints:
+        #             MaxLength: 255
+        #             MinLength: 6
+        #         Mutable: true
+        #         Required: true
 
     UserPoolClient:
       Type: AWS::Cognito::UserPoolClient
@@ -203,109 +239,26 @@ Resources:
         ExplicitAuthFlows:
             - USER_PASSWORD_AUTH
 
-    IdentityPool:
-        Type: AWS::Cognito::IdentityPool
-        Properties:
-            AllowUnauthenticatedIdentities: false
-            CognitoIdentityProviders:
-              - ProviderName: !GetAtt UserPool.ProviderName
-                ClientId: !Ref UserPoolClient
+    # SMSRole:
+    #     Type: AWS::IAM::Role
+    #     Properties:
+    #         AssumeRolePolicyDocument:
+    #             Version: '2012-10-17'
+    #             Statement:
+    #               - Effect: 'Allow'
+    #                 Principal: {Service: ['cognito-idp.amazonaws.com'] }
+    #                 Action: ['sts:AssumeRole']
+    #         Policies:
+    #           - PolicyName: cognito-sns-sms
+    #             PolicyDocument:
+    #                 Version: '2012-10-17'
+    #                 Statement:
+    #                   - Effect: 'Allow'
+    #                     Action:
+    #                       - 'sns:publish'
+    #                     Resource:
+    #                       - '*'
 
-    SMSRole:
-        Type: AWS::IAM::Role
-        Properties:
-            AssumeRolePolicyDocument:
-                Version: '2012-10-17'
-                Statement:
-                  - Effect: 'Allow'
-                    Principal: {Service: ['cognito-idp.amazonaws.com'] }
-                    Action:
-                      - 'sts:AssumeRole'
-            Policies:
-              - PolicyName: cognito-sns-sms
-                PolicyDocument:
-                    Version: '2012-10-17'
-                    Statement:
-                      - Effect: 'Allow'
-                        Action:
-                          - 'sns:publish'
-                        Resource:
-                          - '*'
-
-    CognitoAuthorizedRole:
-        Type: AWS::IAM::Role
-        Properties:
-            AssumeRolePolicyDocument:
-                Version: '2012-10-17'
-                Statement:
-                  - Effect: 'Allow'
-                    Principal: {Federated: 'cognito-identity.amazonaws.com'}
-                    Action:
-                      - 'sts:AssumeRoleWithWebIdentity'
-                    Condition:
-                        StringEquals:
-                            'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
-                        'ForAnyValue:StringLike':
-                            'cognito-identity.amazonaws.com:amr': 'authenticated'
-            Policies:
-              - PolicyName: CognitoAuthorizedPolicy
-                PolicyDocument:
-                    Version: '2012-10-17'
-                    Statement:
-                      - Effect: 'Allow'
-                        Action:
-                          - 'mobileanalytics:PutEvents'
-                          - 'cognito-sync:*'
-                          - 'cognito-identity:*'
-                        Resource:
-                          - '*'
-              - PolicyName: dynamodb-list-own-keys
-                PolicyDocument:
-                    Version: '2012-10-17'
-                    Statement:
-                      - Effect: 'Allow'
-                        Action:
-                          - 'dynamodb:GetBatchItem'
-                          - 'dynamodb:GetItem'
-                          - 'dynamodb:Scan'
-                          - 'dynamodb:Query'
-                        Resource:
-                          - !GetAtt UploadTable.Arn
-
-    CognitoUnAuthorizedRole:
-        Type: AWS::IAM::Role
-        Properties:
-            AssumeRolePolicyDocument:
-                Version: '2012-10-17'
-                Statement:
-                  - Effect: 'Allow'
-                    Principal: {Federated: 'cognito-identity.amazonaws.com'}
-                    Action:
-                      - 'sts:AssumeRoleWithWebIdentity'
-                    Condition:
-                        StringEquals:
-                            'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
-                        'ForAnyValue:StringLike':
-                            'cognito-identity.amazonaws.com:amr': 'unauthenticated'
-            Policies:
-              - PolicyName: CognitoUnauthorizedPolicy
-                PolicyDocument:
-                    Version: '2012-10-17'
-                    Statement:
-                      - Effect: 'Allow'
-                        Action:
-                          - 'mobileanalytics:PutEvents'
-                          - 'cognito-sync:*'
-                        Resource:
-                          - '*'
-
-    IdentityPoolRoleMapping:
-        Type: AWS::Cognito::IdentityPoolRoleAttachment
-        Properties:
-            IdentityPoolId: !Ref IdentityPool
-            Roles:
-                authenticated: !GetAtt CognitoAuthorizedRole.Arn
-                unauthenticated: !GetAtt CognitoUnAuthorizedRole.Arn
 
 Outputs:
     EndpointDomainName:
@@ -314,25 +267,29 @@ Outputs:
         Value: !Sub 'https://${DomainName}'
 
     # Functions
-    CreateUploadUrlFunction:
+    ListObjectsFunction:
         Description: 'Get Upload URL Lambda Function ARN'
-        Value: !GetAtt CreateUploadUrlFunction.Arn
-    CreateUploadUrlFunctionIamRole:
-        Description: 'Implicit IAM Role created for CreateUploadUrlFunction'
-        Value: !GetAtt CreateUploadUrlFunctionRole.Arn
+        Value: !GetAtt ListObjectsFunction.Arn
+    ListObjectsFunctionIamRole:
+        Description: 'Implicit IAM Role created for ListObjectsFunction'
+        Value: !GetAtt ListObjectsFunctionRole.Arn
+    CreateObjectdFunction:
+        Description: 'Get Upload URL Lambda Function ARN'
+        Value: !GetAtt CreateObjectFunction.Arn
+    CreateObjectdFunctionIamRole:
+        Description: 'Implicit IAM Role created for CreateObjectFunction'
+        Value: !GetAtt CreateObjectFunctionRole.Arn
 
     # Storage
     UploadBucket:
         Description: 'Bucket where files are stored'
-        Value: !GetAtt UploadBucket.Arn
+        Value: !Ref UploadBucket
     UploadTable:
         Description: 'Table where metadata are stored'
-        Value: !GetAtt UploadTable.Arn
+        Value: !Ref UploadTable
 
     # Authentication
     UserPoolId:
         Value: !Ref UserPool
     UserPoolClientId:
         Value: !Ref UserPoolClient
-    IdentityPoolId:
-        Value: !Ref IdentityPool

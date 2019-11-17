@@ -7,7 +7,7 @@ AWS_REGION=us-east-1
 
 settings: src/settings.json
 
-src/settings.json:
+src/settings.json: get-stack-outputs.jq generate-settings.jq
 	aws cloudformation describe-stacks \
 		--profile=$(AWS_PROFILE) \
 		--region=$(AWS_REGION) \

@@ -27,7 +27,7 @@ deploy: packaged.yaml
 		--stack-name=$(STACK_NAME) \
 		--template-file=$<
 
-packaged.yaml: template.yaml create_upload_url/requirements.txt create_upload_url/app.py
+packaged.yaml: template.yaml objects_api/requirements.txt objects_api/list_objects.py objects_api/create_object.py
 	aws cloudformation package \
 		--profile=$(AWS_PROFILE) \
 		--region=$(AWS_REGION) \
