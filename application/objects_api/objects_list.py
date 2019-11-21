@@ -7,9 +7,10 @@ from uploader_utils import apigateway_response, apigateway_get_user_id
 
 
 TABLE_FIELDS = (
-    "user_id",
-    "filename",
     "storage_key",
+    "user_id",
+    "object_id",
+    "filename",
     "content_type",
     "size",
     "created_at",

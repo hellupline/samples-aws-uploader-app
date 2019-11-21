@@ -31,72 +31,147 @@ Mappings: {}
 
 Conditions: {}
 
+Globals:
+    Function:
+        Runtime: python3.7
+        MemorySize: 128
+        Timeout: 3
+        Environment:
+            Variables:
+                BUCKET_NAME: !Ref UploadBucket
+                KEY_PREFIX: !Ref KeyPrefix
+                TABLE_NAME: !Ref UploadTable
+
+
 Resources:
     #
     # Functions
     #
-    ListObjectsFunction:
+    ObjectsListFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: objects_api
-            Handler: list_objects.lambda_handler
-            Runtime: python3.7
-            Timeout: 3
-            Environment:
-                Variables:
-                    TABLE_NAME: !Ref UploadTable
+            Role: !GetAtt ObjectsApiFunctionRole.Arn
+            CodeUri: objects_api/
+            Handler: objects_list.lambda_handler
             Events:
-                CreateObjectd:
+                ObjectsApi:
                     Type: Api
                     Properties:
+                        RestApiId: !Ref RestApi
+                        Auth: {Authorizer: CognitoAuthorizer}
                         Path: /objects
                         Method: GET
-                        RestApiId: !Ref RestApi
-                        Auth:
-                            Authorizer: CognitoAuthorizer
-            Policies:
-              - Version: '2012-10-17'
-                Statement:
-                  - Effect: Allow
-                    Action:
-                      - 'dynamodb:Query'
-                    Resource:
-                      - !GetAtt UploadTable.Arn
 
-    CreateObjectFunction:
+    ObjectsCreateFunction:
         Type: AWS::Serverless::Function
         Properties:
-            CodeUri: objects_api
-            Handler: create_object.lambda_handler
-            Runtime: python3.7
-            Timeout: 3
-            Environment:
-                Variables:
-                    BUCKET_NAME: !Ref UploadBucket
-                    KEY_PREFIX: !Ref KeyPrefix
-                    TABLE_NAME: !Ref UploadTable
+            Role: !GetAtt ObjectsApiFunctionRole.Arn
+            CodeUri: objects_api/
+            Handler: objects_create.lambda_handler
             Events:
-                CreateObjectd:
+                ObjectsApi:
                     Type: Api
                     Properties:
+                        RestApiId: !Ref RestApi
+                        Auth: {Authorizer: CognitoAuthorizer}
                         Path: /objects
                         Method: POST
+
+    ObjectDownloadFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Role: !GetAtt ObjectsApiFunctionRole.Arn
+            CodeUri: objects_api/
+            Handler: object_download.lambda_handler
+            Events:
+                ObjectsApi:
+                    Type: Api
+                    Properties:
                         RestApiId: !Ref RestApi
-                        Auth:
-                            Authorizer: CognitoAuthorizer
-            Policies:
-              - Version: '2012-10-17'
+                        Auth: {Authorizer: CognitoAuthorizer}
+                        Path: /objects/{object_id}/download
+                        Method: GET
+
+    ObjectGetFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Role: !GetAtt ObjectsApiFunctionRole.Arn
+            CodeUri: objects_api/
+            Handler: object_get.lambda_handler
+            Events:
+                ObjectsApi:
+                    Type: Api
+                    Properties:
+                        RestApiId: !Ref RestApi
+                        Auth: {Authorizer: CognitoAuthorizer}
+                        Path: /objects/{object_id}
+                        Method: GET
+
+    ObjectUpdateFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Role: !GetAtt ObjectsApiFunctionRole.Arn
+            CodeUri: objects_api/
+            Handler: object_update.lambda_handler
+            Events:
+                ObjectsApi:
+                    Type: Api
+                    Properties:
+                        RestApiId: !Ref RestApi
+                        Auth: {Authorizer: CognitoAuthorizer}
+                        Path: /objects/{object_id}
+                        Method: PUT,PATCH
+
+    ObjectDeleteFunction:
+        Type: AWS::Serverless::Function
+        Properties:
+            Role: !GetAtt ObjectsApiFunctionRole.Arn
+            CodeUri: objects_api/
+            Handler: object_delete.lambda_handler
+            Events:
+                ObjectsApi:
+                    Type: Api
+                    Properties:
+                        RestApiId: !Ref RestApi
+                        Auth: {Authorizer: CognitoAuthorizer}
+                        Path: /objects/{object_id}
+                        Method: DELETE
+
+    ObjectsApiFunctionRole:
+        Type: AWS::IAM::Role
+        Properties:
+            AssumeRolePolicyDocument:
+                Version: '2012-10-17'
                 Statement:
-                  - Effect: Allow
-                    Action:
-                      - 'dynamodb:PutItem'
-                    Resource:
-                      - !GetAtt UploadTable.Arn
-                  - Effect: Allow
-                    Action:
-                      - 's3:PutObject'
-                    Resource:
-                      - !Sub '${UploadBucket.Arn}/${KeyPrefix}/*'
+                  - Effect: 'Allow'
+                    Principal: {Service: ['lambda.amazonaws.com'] }
+                    Action: ['sts:AssumeRole']
+            ManagedPolicyArns:
+              - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+            Policies:
+              - PolicyName: dynamodb-crud
+                PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 'dynamodb:GetItem'
+                          - 'dynamodb:PutItem'
+                          - 'dynamodb:DeleteItem'
+                          - 'dynamodb:Query'
+                        Resource:
+                          - !GetAtt UploadTable.Arn
+              - PolicyName: s3-crud
+                PolicyDocument:
+                    Version: '2012-10-17'
+                    Statement:
+                      - Effect: Allow
+                        Action:
+                          - 's3:GetObject'
+                          - 's3:PutObject'
+                          - 's3:DeleteObject'
+                        Resource:
+                          - !Sub '${UploadBucket.Arn}/${KeyPrefix}/*'
     #
     # Api
     #
@@ -168,21 +243,11 @@ Resources:
         Properties:
             BillingMode: PAY_PER_REQUEST
             AttributeDefinitions:
-              # - {AttributeName: 'storage_key', AttributeType: 'S'}
               - {AttributeName: 'user_id', AttributeType: 'S'}
-              - {AttributeName: 'filename', AttributeType: 'S'}
+              - {AttributeName: 'object_id', AttributeType: 'S'}
             KeySchema:
               - {AttributeName: 'user_id', KeyType: 'HASH'}
-              - {AttributeName: 'filename', KeyType: 'RANGE'}
-            # GlobalSecondaryIndexes:
-            #   - IndexName: 'storage'
-            #     KeySchema:
-            #       - {AttributeName: 'storage_key', KeyType: 'HASH'}
-            #     Projection:
-            #         NonKeyAttributes:
-            #           - 'user_id'
-            #           - 'filename'
-            #         ProjectionType: INCLUDE
+              - {AttributeName: 'object_id', KeyType: 'RANGE'}
 
     #
     # Authentication
@@ -260,6 +325,7 @@ Resources:
     #                       - '*'
 
 
+
 Outputs:
     EndpointDomainName:
         Description: 'API Gateway endpoint URL for Prod stage'
@@ -267,18 +333,24 @@ Outputs:
         Value: !Sub 'https://${DomainName}'
 
     # Functions
-    ListObjectsFunction:
-        Description: 'Get Upload URL Lambda Function ARN'
-        Value: !GetAtt ListObjectsFunction.Arn
-    ListObjectsFunctionIamRole:
-        Description: 'Implicit IAM Role created for ListObjectsFunction'
-        Value: !GetAtt ListObjectsFunctionRole.Arn
-    CreateObjectdFunction:
-        Description: 'Get Upload URL Lambda Function ARN'
-        Value: !GetAtt CreateObjectFunction.Arn
-    CreateObjectdFunctionIamRole:
-        Description: 'Implicit IAM Role created for CreateObjectFunction'
-        Value: !GetAtt CreateObjectFunctionRole.Arn
+    ObjectsListFunction:
+        Description: 'Objects List Lambda Function ARN'
+        Value: !GetAtt ObjectsListFunction.Arn
+    ObjectdCreateFunction:
+        Description: 'Objects Create Lambda Function ARN'
+        Value: !GetAtt ObjectsCreateFunction.Arn
+    ObjectdDownloadFunction:
+        Description: 'Object Download Lambda Function ARN'
+        Value: !GetAtt ObjectDownloadFunction.Arn
+    ObjectdGetFunction:
+        Description: 'Object Get Lambda Function ARN'
+        Value: !GetAtt ObjectGetFunction.Arn
+    ObjectdUpdateFunction:
+        Description: 'Object Update Lambda Function ARN'
+        Value: !GetAtt ObjectUpdateFunction.Arn
+    ObjectdDeteteFunction:
+        Description: 'Object Detete Lambda Function ARN'
+        Value: !GetAtt ObjectDeleteFunction.Arn
 
     # Storage
     UploadBucket:

@@ -1,7 +1,8 @@
 import datetime
+import json
 import os
-import uuid
 import typing as T
+import uuid
 
 import boto3
 
@@ -21,13 +22,14 @@ table = dynamodb.Table(TABLE_NAME)
 def lambda_handler(event, context) -> T.Dict[str, T.Any]:
     now = datetime.datetime.now(tz=datetime.timezone.utc).isoformat()
     user_id = apigateway_get_user_id(event)
-    file_id = str(uuid.uuid4())
-    storage_key = os.path.join(KEY_PREFIX, user_id, file_id)
-    filename, content_type, size = get_file_data(event, file_id)
+    object_id = str(uuid.uuid4())
+    storage_key = os.path.join(KEY_PREFIX, user_id, object_id)
+    filename, content_type, size = get_file_data(event, object_id)
     item = {
-        "user_id": user_id,
-        "filename": filename,
         "storage_key": storage_key,
+        "user_id": user_id,
+        "object_id": object_id,
+        "filename": filename,
         "content_type": content_type,
         "size": size,
         "created_at": now,
@@ -35,11 +37,11 @@ def lambda_handler(event, context) -> T.Dict[str, T.Any]:
     }
 
     table.put_item(Item=item)
-    upload_url = generate_url(storage_key, content_type)
+    upload_url = generate_upload_url(storage_key, content_type)
     return apigateway_response({"upload_url": upload_url, "item": item})
 
 
-def generate_url(key_name: str, content_type: str) -> str:
+def generate_upload_url(key_name: str, content_type: str) -> str:
     return s3.generate_presigned_url(
         ClientMethod="put_object",
         Params={
@@ -53,10 +55,13 @@ def generate_url(key_name: str, content_type: str) -> str:
     )
 
 
-def get_file_data(event, file_id: str) -> T.Tuple[str, str, str]:
-    filename = event["queryStringParameters"].get("filename") or file_id
-    content_type = event["queryStringParameters"].get("content_type") or "octet/stream"
-    size = event["queryStringParameters"].get("size") or "0"
-    if not size.isnumeric():
-        raise TypeError(f"expected 'size' to be int, got {type(size)}")
+def get_file_data(event, object_id: str) -> T.Tuple[str, str, str]:
+    payload = json.loads(event["body"])
+    filename = payload.get("filename", object_id)
+    content_type = payload.get("content_type", "octet/stream")
+    size = payload.get("size", 0)
+    if type(size) == str:
+        if not size.isnumeric():
+            raise TypeError(f"expected 'size' to be int, got {type(size)}")
+        size = int(size)
     return filename, content_type, size
