@@ -1,22 +1,45 @@
 import React from 'react';
+import PropTypes from 'prop-types';
+import { connect } from 'react-redux';
 
 import { Button } from 'reactstrap';
 
-import { ObjectsList } from 'components/ObjectsList';
+import ObjectsList from 'components/ObjectsList';
+
+import thunks from 'thunks';
 
 
-export function ObjectsPanel({ reloadFunc, items }) {
-    const onClickReload = event => {
+function ObjectsPanel({ loading, reload }) {
+    React.useEffect(() => { reload(); }, [reload]);
+
+    const onClickReload = (event) => {
         event.preventDefault();
-        reloadFunc(); 
-    }
+        reload();
+    };
 
     return (
-        <React.Fragment>
+        <>
             <Button onClick={onClickReload} color="primary"> Refresh </Button>
-            <ObjectsList reloadFunc={reloadFunc} items={items} />
-        </React.Fragment>
+            <ObjectsList />
+        </>
     );
 }
 
 
+ObjectsPanel.propTypes = {
+    loading: PropTypes.bool.isRequired,
+    reload: PropTypes.func.isRequired,
+};
+
+
+const mapStateToPros = ({ userObjects: { loading } }) => ({
+    loading,
+});
+
+
+const mapDispatchToProps = (dispatch) => ({
+    reload: thunks.reloadUserObjects(dispatch),
+});
+
+
+export default connect(mapStateToPros, mapDispatchToProps)(ObjectsPanel);

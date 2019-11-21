@@ -1,21 +1,43 @@
 import React from 'react';
+import PropTypes from 'prop-types';
+import { connect } from 'react-redux';
 
-import { ListGroup } from 'reactstrap'
+import { ListGroup } from 'reactstrap';
 
-import { FileUploader } from 'components/FileUploader';
+import FileUploaderListItem from 'components/FileUploaderListItem';
 
 
-export function FileUploaderList({ removeFileFunc, files }) {
+function FileUploaderList({ items }) {
     return (
         <ListGroup variant="flush">
-            {files.map(row => (
-                <FileUploader
-                    key={row.key} 
-                    removeFileFunc={removeFileFunc} 
-                    key_={row.key} 
-                    file={row.file} 
+            {items.map((item) => (
+                <FileUploaderListItem
+                    key={item.key}
+                    name={item.file.name}
+                    size={item.file.size}
+                    cancelToken={item.cancelToken}
+                    state={item.state}
+                    progress={item.progress}
+                    key_={item.key}
+                    file={item.file}
                 />
             ))}
         </ListGroup>
     );
 }
+
+
+FileUploaderList.propTypes = {
+    items: PropTypes.arrayOf(PropTypes.shape({
+        key: PropTypes.string.isRequired,
+        file: PropTypes.any.isRequired,
+    })).isRequired,
+};
+
+
+const mapStateToPros = ({ uploadingFiles: { items } }) => ({
+    items,
+});
+
+
+export default connect(mapStateToPros)(FileUploaderList);

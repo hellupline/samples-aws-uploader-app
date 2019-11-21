@@ -1,26 +1,29 @@
 import React from 'react';
-import uuid from 'uuid/v4';
+import PropTypes from 'prop-types';
+import { connect } from 'react-redux';
 
-import { UploadDropzone } from 'components/UploadDropzone';
-import { FileUploaderList } from 'components/FileUploaderList';
+import UploadDropzone from 'components/UploadDropzone';
+import FileUploaderList from 'components/FileUploaderList';
 
 
-export function UploadDropzonePanel({ reloadFunc }) {
-    const [files, setFiles] = React.useState([]);
-
-    const addFiles = React.useCallback(newFiles => {
-        const rows = newFiles.map(row => ({ key: uuid(), file: row }));
-        setFiles([...files, ...rows]) ;
-    }, [files]);
-
-    const removeFile = React.useCallback(key => {
-        setFiles(files.filter(row => row.key !== key));
-    }, [files]);
-
+function UploadDropzonePanel({ items }) {
     return (
-        <React.Fragment>
-            <UploadDropzone onDrop={addFiles} />
-            {files.length > 0 && <FileUploaderList removeFileFunc={removeFile} files={files} /> }
-        </React.Fragment>
+        <>
+            <UploadDropzone />
+            {items.length > 0 && <FileUploaderList /> }
+        </>
     );
 }
+
+
+UploadDropzonePanel.propTypes = {
+    items: PropTypes.array.isRequired,
+};
+
+
+const mapStateToPros = ({ uploadingFiles: { items } }) => ({
+    items,
+});
+
+
+export default connect(mapStateToPros)(UploadDropzonePanel);

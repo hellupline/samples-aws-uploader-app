@@ -1,24 +1,25 @@
 import axios from 'axios';
 import { API, Auth } from 'aws-amplify';
 
+export const UPLOAD_STATE_STANDBY = 'standby';
+export const UPLOAD_STATE_IN_PROGRESS = 'in-progress';
+export const UPLOAD_STATE_COMPLETED = 'completed';
+export const UPLOAD_STATE_ERROR = 'error';
 
-export async function listFiles() {
-    try {
-        const token = (await Auth.currentSession()).getIdToken().getJwtToken();
-        const args = {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        };
-        const res = await API.get('uploader', '/objects', args);
-        return res.items;
-    } catch (ex) {
-        throw ex;
-    }
+
+async function listFiles() {
+    const token = (await Auth.currentSession()).getIdToken().getJwtToken();
+    const args = {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    };
+    const res = await API.get('uploader', '/objects', args);
+    return res.items;
 }
 
 
-export async function uploadFile(file, requestCancel, setState, setProgress) {
+async function uploadFile(file, requestCancel, setState, setProgress) {
     try {
         const token = (await Auth.currentSession()).getIdToken().getJwtToken();
         const args = {
@@ -34,49 +35,51 @@ export async function uploadFile(file, requestCancel, setState, setProgress) {
         const res = await API.post('uploader', '/objects', args);
         const { upload_url: uploadUrl } = res;
 
-        setState('in-progress');
+        setState(UPLOAD_STATE_IN_PROGRESS);
         await axios.put(uploadUrl, file, {
             onUploadProgress: (e) => setProgress(e.loaded),
             cancelToken: requestCancel.token,
             headers: { 'Content-Type': file.type },
         });
-        setState('completed');
+        setState(UPLOAD_STATE_COMPLETED);
     } catch (ex) {
-        setState('error');
+        setState(UPLOAD_STATE_ERROR);
+        // XXX: send delete do backend
         throw ex;
     }
 }
 
 
-export async function downloadFile(object_id) {
-    try {
-        const token = (await Auth.currentSession()).getIdToken().getJwtToken();
-        const args = {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        };
-        const res = await API.get('uploader', `/objects/${object_id}/download`, args);
-        const { download_url } = res;
+async function downloadFile(objectId) {
+    const token = (await Auth.currentSession()).getIdToken().getJwtToken();
+    const args = {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    };
+    const res = await API.get('uploader', `/objects/${objectId}/download`, args);
+    const { download_url: downloadUrl } = res;
 
-        console.log(download_url);
-    } catch (ex) {
-        throw ex;
-    }
+    // XXX: send browser to url
+    console.log(downloadUrl);
 }
 
 
-export async function deleteFile(object_id) {
-    try {
-        const token = (await Auth.currentSession()).getIdToken().getJwtToken();
-        const args = {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        };
-        const res = await API.del('uploader', `/objects/${object_id}`, args);
-        return res.items;
-    } catch (ex) {
-        throw ex;
-    }
+async function deleteFile(objectId) {
+    const token = (await Auth.currentSession()).getIdToken().getJwtToken();
+    const args = {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    };
+    const res = await API.del('uploader', `/objects/${objectId}`, args);
+    return res.items;
 }
+
+
+export default {
+    listFiles,
+    uploadFile,
+    downloadFile,
+    deleteFile,
+};
