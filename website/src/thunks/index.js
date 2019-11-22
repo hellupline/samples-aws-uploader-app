@@ -25,7 +25,10 @@ const reloadUserObjects = (dispatch) => async () => {
 
 
 const downloadUserObjects = (dispatch) => async (objectId) => {
-    await api.downloadFile(objectId);
+    const url = await api.downloadFile(objectId);
+    if (url !== undefined) {
+        window.open(url);
+    }
     reloadUserObjects(dispatch)();
 };
 

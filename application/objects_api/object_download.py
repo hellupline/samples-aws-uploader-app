@@ -15,7 +15,7 @@ s3 = boto3.client("s3")
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 
-FIELDS = ("storage_key",)
+FIELDS = ("storage_key", "filename", "content_type")
 
 
 def lambda_handler(event, context) -> T.Dict[str, T.Any]:
@@ -27,15 +27,22 @@ def lambda_handler(event, context) -> T.Dict[str, T.Any]:
 
     item = table.get_item(Key=key, ProjectionExpression=expression)["Item"]
     storage_key = item["storage_key"]
+    filename = item["filename"]
+    content_type = item["content_type"]
 
-    download_url = generate_url(storage_key)
+    download_url = generate_url(storage_key, filename, content_type)
     return apigateway_response({"download_url": download_url})
 
 
-def generate_url(key_name: str) -> str:
+def generate_url(key_name: str, filename: str, content_type: str) -> str:
     return s3.generate_presigned_url(
         ClientMethod="get_object",
-        Params={"Bucket": BUCKET_NAME, "Key": key_name},
+        Params={
+            "Bucket": BUCKET_NAME,
+            "Key": key_name,
+            "ResponseContentDisposition": f"attachment; filename={filename}",
+            "ResponseContentType": content_type,
+        },
         ExpiresIn=EXPIRATION,
         HttpMethod="GET",
     )

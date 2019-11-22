@@ -37,18 +37,17 @@ def lambda_handler(event, context) -> T.Dict[str, T.Any]:
     }
 
     table.put_item(Item=item)
-    upload_url = generate_upload_url(storage_key, content_type)
+    upload_url = generate_upload_url(storage_key)
     return apigateway_response({"upload_url": upload_url, "item": item})
 
 
-def generate_upload_url(key_name: str, content_type: str) -> str:
+def generate_upload_url(key_name: str) -> str:
     return s3.generate_presigned_url(
         ClientMethod="put_object",
         Params={
             "Bucket": BUCKET_NAME,
             "Key": key_name,
             "ACL": "private",
-            "ContentType": content_type,
         },
         ExpiresIn=EXPIRATION,
         HttpMethod="PUT",

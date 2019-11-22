@@ -39,7 +39,7 @@ async function uploadFile(file, requestCancel, setState, setProgress) {
         await axios.put(uploadUrl, file, {
             onUploadProgress: (e) => setProgress(e.loaded),
             cancelToken: requestCancel.token,
-            headers: { 'Content-Type': file.type },
+            headers: { 'Content-Type': '' },
         });
         setState(UPLOAD_STATE_COMPLETED);
     } catch (ex) {
@@ -58,10 +58,7 @@ async function downloadFile(objectId) {
         },
     };
     const res = await API.get('uploader', `/objects/${objectId}/download`, args);
-    const { download_url: downloadUrl } = res;
-
-    // XXX: send browser to url
-    console.log(downloadUrl);
+    return res.download_url;
 }
 
 
@@ -73,7 +70,7 @@ async function deleteFile(objectId) {
         },
     };
     const res = await API.del('uploader', `/objects/${objectId}`, args);
-    return res.items;
+    return res.success;
 }
 
 
